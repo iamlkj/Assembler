@@ -1,6 +1,8 @@
 #include<iostream>
 #include<string>
+#include <fstream>
 using namespace std;
+#define opmax 82
 class ops
 {
 	public:
@@ -14,7 +16,24 @@ class lab
 	string label;
 	char adr[6];
 }labtab[1000];
-
+class TTAB
+{
+	
+	public:
+		TTAB()
+		{
+		chg=0;	
+		}
+	string obj;
+	int chg;
+	char adr[6];
+}t[1000];
+class MTAB
+{
+	
+	public:
+	string obj;	
+}m[1000];
 void setoptab()
 {	
 	optab[0].op="ADD   ";
@@ -344,16 +363,48 @@ void setoptab()
 	optab[80].op="RESB  ";
 	optab[80].f=9;
 	
+	
+	
 	optab[81].op="BYTE  ";
 	optab[81].f=10;
 	
+	optab[82].op="BASE  ";
+	optab[82].f=11;
 }
 FILE *in;
 FILE *out;
 string filename;
+char flag;
+int findit;
 int errorflag;
 int count;
 int labcount;
+int mcount;
+int tcount;
+
+string findop(string line)
+{
+	if(line[0]=='.')return 0;
+	line[8]=0;
+	line[15]=0;
+	line[16]=0;
+	line[35]='\0';
+	
+	
+	for(int i=0;i<opmax+1;i++)
+	{
+		
+		if(line.find(optab[i].op)!=string::npos)
+		{
+			
+			return optab[i].code;
+			
+		}
+	}
+	
+	return 0;
+	
+}
 int findopmode(string line)
 {
 	//for(int k=35;k<80;k++)line[k]=0;
@@ -364,14 +415,14 @@ int findopmode(string line)
 	line[35]='\0';
 	
 	
-	for(int i=0;i<82;i++)
+	for(int i=0;i<opmax+1;i++)
 	{
 		
 		if(line.find(optab[i].op)!=string::npos)
 		{
 			
 			return optab[i].f;
-			//system("pause");
+			
 		}
 	}
 	
@@ -399,7 +450,12 @@ int findlabel(string line,char*count)
             return 0;
         }   
     }
-    labtab[labcount].label=tmp;
+    int i=0;
+    while(tmp[i]!=' ')
+    {
+		labtab[labcount].label=labtab[labcount].label+tmp[i];
+		i++;
+	}
     for(int i=0;i<6;i++)
     {
         labtab[labcount].adr[i]=count[i];   
@@ -421,14 +477,15 @@ int findoffset(char* head,char* c)
 			k--;	
 		}	
 	}
+	
 }
 void addcount(char*count,int x)
 {
     int c=1;
-    for(int i=0;i<x;i++)
+    for(int j=0;j<x;j++)
     {
         c=1;
-        for(int j=5;j>=0;j--)
+        for(int i=5;i>=0;i--)
         {
             count[i]=count[i]+c;
             c=0;
@@ -437,24 +494,194 @@ void addcount(char*count,int x)
                 c=1;
                 count[i]=count[i]-'G'+'0';
             }
-            else if(count[i]>'9')
+            else if(count[i]==':')
             {
                 count[i]=count[i]-'0'-10+'A';   
             }
+           
         }
+         
     }
+    //cout<<x<<"hahaha";
 }
+int findimmediate(char* line)
+{
+	int x=0;
+	int i=17;
+	while(i<35 && line[i]>='0'&&line[i]<='9')	
+	{
+		x=10*x+(line[i]-'0');	
+		i++;
+	}
+	return x;
+}
+void copyadr(char*adr,char*count)
+{
+	for(int i=0;i<6;i++)adr[i]=count[i];	
+}
+string findr(string haha)
+{
+	string rcode;
+	if(haha[17]=='X')rcode=rcode+'1';	
+	else if(haha[17]=='A')rcode=rcode+'0';
+	else if(haha[17]=='L')rcode=rcode+'2';
+	else if(haha[17]=='B')rcode=rcode+'3';
+	else if(haha[17]=='S')rcode=rcode+'4';
+	else if(haha[17]=='T')rcode=rcode+'5';
+	else if(haha[17]=='F')rcode=rcode+'6';
+	
+	if(haha[19]=='X')rcode=rcode+'1';	
+	else if(haha[19]=='A')rcode=rcode+'0';
+	else if(haha[19]=='L')rcode=rcode+'2';
+	else if(haha[19]=='B')rcode=rcode+'3';
+	else if(haha[19]=='S')rcode=rcode+'4';
+	else if(haha[19]=='T')rcode=rcode+'5';
+	else if(haha[19]=='F')rcode=rcode+'6';
+	else rcode=rcode+'0';
+	return rcode;
+}
+string findsym(string tt)
+{
+	//cout<<tt<<"()";
+	
+	string tmp;
+	int i;
+	for( i=17;i<24;i++)
+	{
+		
+		if(tt[i]==' '||tt[i]==0 || tt[i]==10 ||tt[i]=='\0')break;
+		tmp=tmp+tt[i];
+	}
+	
+	
+	
+		tmp=tmp+"    ";
+
+
+	for(int i=0;i<labcount;i++)
+	{
+		if(tmp.find(labtab[i].label)!=string::npos || labtab[i].label.find(tmp)!=string::npos)
+		{
+			
+			findit=1;
+			//cout<<"###"<<"find!"<<labtab[i].label<<"###";
+			
+			return labtab[i].adr;	
+		}
+	}
+	
+	
+	findit=0;
+	return tmp;
+}
+void addflag(int x)
+{
+	flag=flag+x;
+	if(flag>'9'&&flag<'A')flag=flag-'0'-10+'A';	
+}
+void addop(int tcount,int x)
+{
+	int carry=0;
+	t[tcount].obj[1]=t[tcount].obj[1]+x;
+	//cout<<"<<<"<<t[tcount].obj<<">>>";
+	if(t[tcount].obj[1]>'F')
+	{
+		carry=1;
+		t[tcount].obj[1]=t[tcount].obj[1]-'G'+'0';
+	}
+	else if(t[tcount].obj[1]>'9' && t[tcount].obj[1]<'A')
+	{
+		t[tcount].obj[1]=t[tcount].obj[1]-'0'-10+'A';
+	}
+	if(carry)
+	{
+		t[tcount].obj[0]=t[tcount].obj[0]+1;
+		if(t[tcount].obj[0]>9&&t[tcount].obj[0]<'A')
+		{
+			t[tcount].obj[0]=t[tcount].obj[0]-'0'-10+'A';
+		}
+	}
+	
+}
+int subadr(string& ans,string a,string b,int f)
+{
+	//cout<<"!!"<<a<<"!!"<<b<<endl;
+	
+		char tmp[6];
+		int chk=0;
+		int bo=0;
+		while(chk<=5 && a[chk]==b[chk])chk++;
+		if(chk==6)
+		{
+			int i=f;
+			while(i!=6)
+			{
+				ans=ans+"0";
+				i++;
+			}
+			//cout<<ans;
+			//system("pause");
+			return 1;	
+		}
+		if(b[chk]>a[chk])return 0;
+		
+		for(int i=5;i>=0;i--)
+		{
+			if(a[i]>='A')a[i]=a[i]-'A'+10;
+			else a[i]=a[i]-'0';
+			if(b[i]>='A')b[i]=b[i]-'A'+10;
+			else b[i]=b[i]-'0';
+			if((a[i])>=(b[i]+bo))
+			{
+				tmp[i]=(a[i])-(b[i]+bo)+'0';
+				if(tmp[i]>'9')tmp[i]=tmp[i]-'0'-10+'A';
+				bo=0;
+			}
+			else
+			{
+				
+				tmp[i]=(a[i]+16)-(b[i]+bo)+'0';
+				if(tmp[i]>'9')tmp[i]=tmp[i]-'0'-10+'A';
+				bo=1;
+				
+			}
+		}
+		for(int i=f;i<=5;i++)ans=ans+tmp[i];
+		return 1;
+}
+int findx(char* tt)
+{
+	int x=17;
+	while(tt[x]!=',' && x<35)x++;
+	if(x>=35)return 0;
+	else if(tt[++x]=='X')return 1;	
+}
+int big(string a,string b)
+{
+	int i=0;
+	while(a[i]==b[i] && i<6)i++;
+	if(i==6)return 1;
+	if(a[i]>b[i])return 1;
+	else return 0;
+}
+
 int main()
 {
+	int headf=0;
+	char base[7];
 	char* end;
 	char tmp[80];
 	char count[7];
+	string headhead;
 	count[6]='\0';
+	base[6]='\0';
 	in=fopen("input.asm","r");
-	out=fopen("output.txt","w");
+	ofstream fout ("output.txt");
 	setoptab();
-		//system("pause");
+		
 	fgets(tmp,79,in);
+	tmp[35]='\0';
+	for(int i=36;i<79;i++)tmp[i]=0;
 	
 	int start=findopmode(tmp);
 	
@@ -462,7 +689,7 @@ int main()
 	
 	if(start==5)
 	{
-		
+		headf=1;
 		string tt=tmp;
 		char buffer[20];
 		
@@ -471,30 +698,403 @@ int main()
 		filename="H";
 		filename=filename+buffer;
 		findoffset(tmp,count);
-		
+		headhead=count;
+		filename=filename+count;
 		end=fgets(tmp,79,in);
 		cout<<filename;
-		cout<<count;
-		system("pause");
+		//cout<<count;
+	
 		
 	}
 	else filename="H      ";
-	while(end!=NULL)
+	while(!(findopmode(tmp)==6&&tmp[0]!='.'))
 	{
+		int modetmp=findopmode(tmp);
         if(tmp[0]=='.')goto cmd;
 		findlabel(tmp,count);
-		if(findopmode(tmp)==)
+		
+		if(modetmp==2)
 		{
-               
+            addcount(count,2);
         }
-                
-		addcount(count,3);
+        else if(modetmp==3)
+        {
+			addcount(count,3);
+		}
+		else if(modetmp==4)
+		{
+			addcount(count,4);	
+		}
+		else if(modetmp==7)
+		{
+			addcount(count,3);
+		}
+		else if(modetmp==8)
+		{
+			int imtmp=findimmediate(tmp);
+			addcount(count,3*imtmp);
+			
+		}
+		else if(modetmp==9)
+		{
+			int imtmp=findimmediate(tmp);
+			addcount(count,imtmp);
+			
+		}
+		else if(modetmp==10)
+		{
+			int k=0;
+			int i=19;
+			while(i<35 && tmp[i]!=39)
+			{
+				k++;
+				i++;
+			}
+			if(tmp[17]=='X')
+			{
+				if(k%2)k=k/2+1;
+				else k=k/2;	
+			}
+			else if(tmp[17]!='C')
+			{
+				errorflag=2;
+			}
+			addcount(count,k);
+		}
+		else
+		{
+			errorflag=3;
+		}
+		//addcount(count,3);
 		cmd:
+			cout<<count<<"   "<<tmp<<endl;
+			for(int i=0;i<79;i++)tmp[i]=0;
+			fgets(tmp,79,in);
+			tmp[35]='\0';
+			for(int i=36;i<79;i++)tmp[i]=0;
+			
+		
+	}
+	//header
+	filename=filename+count;
+	fout<<filename<<endl;
+	
+	//
+	for(int i=0;i<labcount;i++)
+	{
+		cout<<labtab[i].label<<"="<<labtab[i].adr<<endl;	
 	}
 	
+	fseek ( in , 0 , SEEK_SET );
+	//fgets(tmp,79,in);
 	
 	
+//cout<<"!!"<<tmp<<"!!"<<endl;
 	
+	///////////////////////////////////////pass2////////////////////////////////
+	for(int i=0;i<79;i++)tmp[i]=0;
+	fgets(tmp,79,in);
+	tmp[35]='\0';
+	//cout<<"!!"<<tmp<<"!!"<<endl;
+	for(int i=36;i<79;i++)tmp[i]=0;
+	for(int i=0;i<6;i++)count[i]='0';	
+	//cout<<"!!"<<count<<"!!"<<endl;
+	if(headf)
+	{
+		findoffset(tmp,count);
+		//cout<<"!!"<<count<<"!!"<<endl;
+		for(int i=0;i<79;i++)tmp[i]=0;
+		fgets(tmp,79,in);
+		tmp[35]='\0';
+		for(int i=36;i<79;i++)tmp[i]=0;
+	}
+	else
+	{
+		for(int i=0;i<6;i++)count[i]='0';	
+	}
 	
-	
+	while(!(findopmode(tmp)==6&&tmp[0]!='.'))
+	{
+		flag='0';
+		int modetmp=findopmode(tmp);
+        if(tmp[0]=='.')goto p2cmd;
+		findlabel(tmp,count);
+		if(modetmp==2)
+		{
+			copyadr(t[tcount].adr,count);
+            addcount(count,2);
+            t[tcount].obj=findop(tmp);
+            t[tcount].obj=t[tcount].obj+findr(tmp);
+            cout<<""<<t[tcount].obj<<endl;
+			
+            tcount++;
+        }
+        else if(modetmp==3)
+        {
+			
+			string test;
+			copyadr(t[tcount].adr,count);
+			addcount(count,3);
+			t[tcount].obj=findop(tmp);
+			
+			if(findx(tmp))addflag(8);///////////////addflag
+			string direct;/////findsym
+			string final;
+			string sttmp;
+			//direct=findsym(tmp);
+			findsym(tmp);
+			
+			
+			if(findit==1)
+			{
+					
+				direct=findsym(tmp);
+			
+			}
+			
+			else
+			{
+				//cout<<"!?";
+				//system("pause");
+				string haha;
+				int i=18;
+				while(tmp[i]>='0'&&tmp[i]<='9'&&i<35)
+				{
+					
+					
+					haha=haha+tmp[i];
+					i++;
+				}
+				
+				if(haha.size()<3)
+				{
+					while(haha.size()<3)
+					{
+						haha="0"+haha;	
+					}
+				}
+				
+				final=haha;
+				
+				//system("pause");
+				goto flags;
+			}
+			//cout<<findsym(tmp);
+				//cout<<"<<<<<<"<<direct<<">>>>>";
+			
+		
+				if(big(direct,count)) 
+				{
+					
+					 subadr(test,direct,count,0);
+					 
+				}
+				else
+				{
+				
+					
+					string tmp;
+					string ha="000FFF";
+					subadr(tmp,count,direct,0);
+					cout<<"@@@"<<tmp<<"  "<<count<<" "<<direct;
+					subadr(test,ha,tmp,0);
+					
+					
+					test[5]=test[5]+1;
+					if(test[5]>'9'&&test[5]<'A')test[5]=test[5]-'0'-10+'A';
+				}
+			
+			if(test[2]=='0')
+			{
+				for(int i=3;i<6;i++)final=final+test[i];
+				addflag(2);
+				//cout<<final;
+			}
+			else
+			{
+				cout<<"OK!!"<<direct<<"  "<<base;
+				subadr(final,direct,base,3);
+				
+				addflag(4);
+			}
+	flags:		
+			if(tmp[17]=='@')
+			{
+				addop(tcount,2);
+			}
+			else if(tmp[17]=='#')
+			{
+				addop(tcount,1);
+			}
+			else
+			{
+				addop(tcount,3);
+			}
+			t[tcount].obj=t[tcount].obj+flag+final;
+		//cout<<tmp<<t[tcount].obj;
+		//system("pause");
+			tcount++;
+			
+			
+		}
+		else if(modetmp==4)
+		{
+			string direct;
+			string final;
+			addflag(1);
+			t[tcount].obj=findop(tmp);
+			if(findx(tmp))addflag(8);///////////////addflag
+			copyadr(t[tcount].adr,count);
+			
+			findsym(tmp);
+			if(findit==1)
+			{
+				direct=findsym(tmp);
+				for(int i=1;i<6;i++)final=final+direct[i];
+				
+				string hahaha=count;
+				hahaha[5]++;
+				m[mcount].obj="M"+hahaha+"05";
+				mcount++;
+			}
+			else
+			{
+				if(tmp[18]=='4')final="01000";
+				
+					errorflag=10;
+			}
+			addcount(count,4);
+			if(tmp[17]=='@')
+			{
+				addop(tcount,2);
+			}
+			else if(tmp[17]=='#')
+			{
+				addop(tcount,1);
+			}
+			else
+			{
+				addop(tcount,3);
+			}
+			t[tcount].obj=t[tcount].obj+flag+final;
+			
+			tcount++;
+			
+			
+			
+		}
+		else if(modetmp==7)
+		{
+			
+			addcount(count,3);
+		}
+		else if(modetmp==8)
+		{
+			int imtmp=findimmediate(tmp);
+			addcount(count,3*imtmp);
+			t[tcount].chg=1;
+			tcount++;
+		}
+		else if(modetmp==9)
+		{
+			int imtmp=findimmediate(tmp);
+			addcount(count,imtmp);
+			t[tcount].chg=1;
+			tcount++;
+		}
+		else if(modetmp==10)
+		{
+			copyadr(t[tcount].adr,count);
+			string final;
+			int k=0;
+			int i=19;
+			while(i<35 && tmp[i]!=39)
+			{
+				k++;
+				i++;
+			}
+			if(tmp[17]=='X')
+			{
+				for(int i=19;i<19+k;i++)
+				{
+					final=final+tmp[i];
+				}
+				if(k%2)k=k/2+1;
+				else k=k/2;	
+			}
+			else if(tmp[17]=='C')
+			{
+				if(tmp[19]=='E'&&k==3)
+				{
+					final="454F46"	;
+				}
+			}
+			
+			else 
+			{
+				errorflag=2;
+			}
+			addcount(count,k);
+			t[tcount].obj=final;
+			cout<<t[tcount].obj;
+			tcount++;
+			
+		}
+		else if(modetmp==11)
+		{
+			string direct=findsym(tmp);
+			for(int i=0;i<6;i++)
+			{
+				base[i]=direct[i];
+			}
+		}
+		else
+		{
+			errorflag=3;
+		}
+		//addcount(count,3);
+		p2cmd:
+			cout<<tmp<<"  "<<t[tcount-1].obj<<endl;
+			for(int i=0;i<79;i++)tmp[i]=0;
+			fgets(tmp,79,in);
+			tmp[35]='\0';
+			for(int i=36;i<79;i++)tmp[i]=0;
+			//system("pause");
+	}
+	int i=0;
+	while(i<tcount)
+	{
+		string line;
+		fout<<"T"<<t[i].adr;
+		while(line.size()<60 && i<tcount)
+		{
+			cout<<line.size()<<"  "<<t[i].obj.size()<<"("<<t[i].obj<<")"<<endl;
+			//system("pause");
+			if(t[i].chg!=1 && line.size()+t[i].obj.size()<60&&i<tcount)
+			{
+				line=line+t[i].obj;
+				i++;	
+			}
+			else if(t[i].chg==1) 
+			{
+				while(t[i].chg==1)i++;
+				break;
+			}
+			else
+			{
+				break;
+			}
+		}
+		if(line.size()/2>15)fout<<hex<<line.size()/2;
+		else fout<<"0"<<hex<<line.size()/2;
+		fout<<line<<endl;
+		
+	}
+	i=0;
+	while(i<mcount)
+	{
+		fout<<m[i].obj<<endl;
+		i++;	
+	}
+	fout<<"E"<<headhead;
 }
